@@ -3,6 +3,7 @@
  * クラシック版Windowsでも動くよう ES2016 の範囲で記述（async/await・import は使わない）
  * v1.1: どこでエラーが起きても必ず event.completed を呼ぶように修正
  * v1.2(調査用): 宛先取得の失敗理由をダイアログとコンソールに出す
+ * v1.3(調査用): Office.onReady 後にも associate し、初期化状況と未捕捉エラーを記録
  */
 
 // ダイアログに出せる文字数には上限があるため、余裕を持って切り詰める
@@ -163,10 +164,36 @@ function onMessageSendHandler(event) {
 }
 
 // マニフェストの FunctionName と関数を対応付ける
-console.log("[送信先確認] launchevent.js v1.2 読み込み");
+console.log("[送信先確認] launchevent.js v1.3 読み込み");
+
+// 未捕捉のエラーも記録する
+if (typeof window !== "undefined" && window.addEventListener) {
+  window.addEventListener("error", function (e) {
+    console.error("[送信先確認] 未捕捉エラー: " + e.message + " @" + e.filename + ":" + e.lineno);
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    console.error("[送信先確認] 未捕捉Promise: " + e.reason);
+  });
+}
+
+function associateHandler(when) {
+  try {
+    Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+    console.log("[送信先確認] associate 完了 (" + when + ")");
+  } catch (e) {
+    console.error("[送信先確認] associate 失敗 (" + when + ")", e);
+  }
+}
+
+// 1回目：読み込み直後（Microsoft公式の書き方）
+associateHandler("即時");
+
+// 2回目：Office.js の初期化完了後（初期化が終わっているかの確認も兼ねる）
 try {
-  Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-  console.log("[送信先確認] associate 完了");
+  Office.onReady(function (info) {
+    console.log("[送信先確認] onReady host=" + (info && info.host) + " platform=" + (info && info.platform));
+    associateHandler("onReady後");
+  });
 } catch (e) {
-  console.error("[送信先確認] associate 失敗", e);
+  console.error("[送信先確認] onReady 登録失敗", e);
 }
