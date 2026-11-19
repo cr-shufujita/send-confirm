@@ -2,6 +2,7 @@
  * 送信先確認アドイン：送信ボタン押下時に To/Cc/Bcc の一覧を表示する
  * クラシック版Windowsでも動くよう ES2016 の範囲で記述（async/await・import は使わない）
  * v1.1: どこでエラーが起きても必ず event.completed を呼ぶように修正
+ * v1.2(調査用): 宛先取得の失敗理由をダイアログとコンソールに出す
  */
 
 // ダイアログに出せる文字数には上限があるため、余裕を持って切り詰める
@@ -42,7 +43,9 @@ function onMessageSendHandler(event) {
     var fields = ["to", "cc", "bcc"];
     var labels = { to: "To", cc: "Cc", bcc: "Bcc" };
     var results = {};
+    var errors = [];
     var pending = fields.length;
+    console.log("[送信先確認] ハンドラー開始");
 
     // 自分のドメイン（社外宛ての判定用）。取得できなくても続行する
     var myDomain = "";
@@ -57,9 +60,18 @@ function onMessageSendHandler(event) {
       try {
         item[field].getAsync(function (result) {
           try {
-            results[field] = result.status === Office.AsyncResultStatus.Succeeded ? result.value : [];
+            if (result.status === Office.AsyncResultStatus.Succeeded) {
+              results[field] = result.value || [];
+              console.log("[送信先確認] " + field + " 取得成功: " + results[field].length + "件");
+            } else {
+              results[field] = [];
+              var msg = result.error ? (result.error.code + " " + result.error.message) : "不明";
+              errors.push(field + ": " + msg);
+              console.error("[送信先確認] " + field + " 取得失敗: " + msg);
+            }
           } catch (e) {
             results[field] = [];
+            errors.push(field + ": " + e);
           }
           pending--;
           if (pending === 0) {
@@ -106,6 +118,15 @@ function onMessageSendHandler(event) {
       });
     });
 
+    // 取得に失敗した欄がある場合は、理由を表示して止める（調査用）
+    if (errors.length > 0) {
+      complete({
+        allowEvent: false,
+        errorMessage: "宛先の取得に失敗しました: " + errors.join(" / ")
+      });
+      return;
+    }
+
     // 宛先が無い場合はOutlook本体のチェックに任せる
     if (total === 0) {
       complete({ allowEvent: true });
@@ -132,6 +153,7 @@ function onMessageSendHandler(event) {
       body += "…ほか " + (lines.length - shown) + "件";
     }
 
+    console.log("[送信先確認] ダイアログ表示: " + total + "件");
     // allowEvent:false + SendMode=PromptUser で、確認ダイアログを毎回表示する
     complete({
       allowEvent: false,
@@ -141,4 +163,10 @@ function onMessageSendHandler(event) {
 }
 
 // マニフェストの FunctionName と関数を対応付ける
-Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+console.log("[送信先確認] launchevent.js v1.2 読み込み");
+try {
+  Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+  console.log("[送信先確認] associate 完了");
+} catch (e) {
+  console.error("[送信先確認] associate 失敗", e);
+}
