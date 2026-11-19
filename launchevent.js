@@ -4,6 +4,7 @@
  * v1.1: どこでエラーが起きても必ず event.completed を呼ぶように修正
  * v1.2(調査用): 宛先取得の失敗理由をダイアログとコンソールに出す
  * v1.3(調査用): Office.onReady 後にも associate し、初期化状況と未捕捉エラーを記録
+ * v1.4: 表示を短縮（社内=名前<アドレス>、部署名の括弧は省略／社外=アドレスのみ）
  */
 
 // ダイアログに出せる文字数には上限があるため、余裕を持って切り詰める
@@ -111,9 +112,15 @@ function onMessageSendHandler(event) {
         if (ext) {
           externalCount++;
         }
-        var name = r.displayName && r.displayName !== r.emailAddress
-          ? r.displayName + " <" + r.emailAddress + ">"
-          : r.emailAddress;
+        var name;
+        if (ext) {
+          // 社外：ドメインの間違いに気づけるよう、アドレスのみ表示
+          name = r.emailAddress;
+        } else {
+          // 社内：表示名から（部署名）などの括弧書きを除き、アドレスを併記
+          var dn = (r.displayName || "").replace(/[（(][^（）()]*[）)]/g, "").replace(/[\s　]+$/, "").replace(/^[\s　]+/, "");
+          name = dn && dn !== r.emailAddress ? dn + " <" + r.emailAddress + ">" : r.emailAddress;
+        }
         lines.push(labels[field] + ": " + (ext ? "【社外】" : "") + name);
         total++;
       });
@@ -134,9 +141,9 @@ function onMessageSendHandler(event) {
       return;
     }
 
-    var header = "以下の宛先に送信します（" + total + "件"
-      + (externalCount > 0 ? "、うち社外 " + externalCount + "件" : "")
-      + "）。よろしければ「そのまま送信する」を押してください。\n";
+    var header = "宛先を確認してください（" + total + "件"
+      + (externalCount > 0 ? "／社外" + externalCount + "件" : "")
+      + "）\n";
 
     var body = "";
     var shown = 0;
@@ -164,7 +171,7 @@ function onMessageSendHandler(event) {
 }
 
 // マニフェストの FunctionName と関数を対応付ける
-console.log("[送信先確認] launchevent.js v1.3 読み込み");
+console.log("[送信先確認] launchevent.js v1.4 読み込み");
 
 // 未捕捉のエラーも記録する
 if (typeof window !== "undefined" && window.addEventListener) {
