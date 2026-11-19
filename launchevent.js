@@ -5,6 +5,7 @@
  * v1.2(調査用): 宛先取得の失敗理由をダイアログとコンソールに出す
  * v1.3(調査用): Office.onReady 後にも associate し、初期化状況と未捕捉エラーを記録
  * v1.4: 表示を短縮（社内=名前<アドレス>、部署名の括弧は省略／社外=アドレスのみ）
+ * v1.5: 見出しと宛先一覧の間に空行を入れる
  */
 
 // ダイアログに出せる文字数には上限があるため、余裕を持って切り詰める
@@ -143,7 +144,7 @@ function onMessageSendHandler(event) {
 
     var header = "宛先を確認してください（" + total + "件"
       + (externalCount > 0 ? "／社外" + externalCount + "件" : "")
-      + "）\n";
+      + "）\n\u3000\n"; // 空行が詰められないよう全角スペースだけの行を挟む
 
     var body = "";
     var shown = 0;
@@ -171,7 +172,7 @@ function onMessageSendHandler(event) {
 }
 
 // マニフェストの FunctionName と関数を対応付ける
-console.log("[送信先確認] launchevent.js v1.4 読み込み");
+console.log("[送信先確認] launchevent.js v1.5 読み込み");
 
 // 未捕捉のエラーも記録する
 if (typeof window !== "undefined" && window.addEventListener) {
